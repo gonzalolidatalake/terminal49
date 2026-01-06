@@ -1,0 +1,10 @@
+# Terminal49 Webhook Receiver Cloud Function Dependencies
+# Python 3.11+
+
+# Google Cloud Platform
+functions-framework==3.5.0
+google-cloud-pubsub==2.18.4
+google-cloud-logging==3.8.0
+
+# Core dependencies (included with functions-framework but explicit for clarity)
+flask==3.0.0

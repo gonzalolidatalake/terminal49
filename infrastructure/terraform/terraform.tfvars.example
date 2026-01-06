@@ -1,0 +1,81 @@
+# Terminal49 Webhook Infrastructure - Terraform Variables Example
+# Copy this file to terraform.tfvars and fill in your actual values
+# NEVER commit terraform.tfvars to version control
+
+# ============================================================================
+# Project Configuration
+# ============================================================================
+project_id  = "li-customer-datalake"
+region      = "us-central1"
+environment = "dev"
+
+# ============================================================================
+# Supabase Configuration
+# ============================================================================
+supabase_url         = "https://srordjhkcvyfyvepzrzp.supabase.co"
+supabase_service_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNyb3JkamhrY3Z5Znl2ZXB6cnpwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjUxOTYwMywiZXhwIjoyMDc4MDk1NjAzfQ.BV2vmD3GSpycdlqK7OERhZi5t7eiekOytJmF08rr6pQ"
+supabase_db_host     = "db.srordjhkcvyfyvepzrzp.supabase.co"
+supabase_db_name     = "postgres"
+supabase_db_user     = "postgres"
+supabase_db_password = "tFKB1FYWcb0rhue5"
+
+# ============================================================================
+# Terminal49 Configuration
+# ============================================================================
+terminal49_webhook_secret = "29b28321bf6f252fba7b3810b8"
+
+# ============================================================================
+# Cloud Functions Configuration
+# ============================================================================
+# Webhook Receiver
+webhook_receiver_memory_mb       = 256
+webhook_receiver_timeout_seconds = 60
+webhook_receiver_max_instances   = 100
+webhook_receiver_min_instances   = 0
+
+# Event Processor
+event_processor_memory_mb       = 512
+event_processor_timeout_seconds = 120
+event_processor_max_instances   = 50
+event_processor_min_instances   = 0
+
+# ============================================================================
+# Pub/Sub Configuration
+# ============================================================================
+pubsub_message_retention_duration = "604800s" # 7 days
+pubsub_ack_deadline_seconds       = 120
+pubsub_max_delivery_attempts      = 5
+
+# ============================================================================
+# BigQuery Configuration
+# ============================================================================
+bigquery_dataset_id              = "terminal49_raw_events"
+bigquery_raw_events_table_id     = "raw_events_archive"
+bigquery_historical_table_id     = "events_historical"
+bigquery_metrics_table_id        = "processing_metrics"
+bigquery_partition_expiration_days = 730 # 2 years
+
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+log_level = "INFO"
+
+# ============================================================================
+# Monitoring Configuration
+# ============================================================================
+# Add notification channel IDs after creating them in Cloud Monitoring
+notification_channels = [
+  # "projects/li-customer-datalake/notificationChannels/1234567890",
+]
+
+webhook_error_rate_threshold           = 5.0
+event_processing_latency_threshold     = 30
+dlq_depth_threshold                    = 100
+
+# ============================================================================
+# Additional Labels
+# ============================================================================
+additional_labels = {
+  cost_center = "platform"
+  owner       = "platform-team"
+}

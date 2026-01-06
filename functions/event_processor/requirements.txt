@@ -1,0 +1,15 @@
+# Event Processor Cloud Function Dependencies
+
+# Google Cloud Functions Framework
+functions-framework==3.5.0
+
+# Google Cloud Libraries
+google-cloud-pubsub==2.18.4
+google-cloud-bigquery==3.13.0
+google-cloud-logging==3.8.0
+
+# PostgreSQL Database Driver
+psycopg2-binary==2.9.9
+
+# Utilities
+python-dateutil==2.8.2

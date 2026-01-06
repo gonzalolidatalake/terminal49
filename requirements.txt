@@ -1,0 +1,78 @@
+# Terminal49 Webhook Infrastructure - Python Dependencies
+# Python 3.11+
+
+# ============================================================================
+# Core Dependencies
+# ============================================================================
+
+# Google Cloud Platform
+google-cloud-functions==1.4.0
+google-cloud-pubsub==2.18.4
+google-cloud-bigquery==3.13.0
+google-cloud-logging==3.8.0
+google-cloud-monitoring==2.16.0
+google-cloud-storage==2.10.0
+
+# Functions Framework (for local testing)
+functions-framework==3.5.0
+
+# Database - PostgreSQL/Supabase
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+supabase==2.3.0
+
+# HTTP and API
+requests==2.31.0
+urllib3==2.1.0
+
+# JSON and Data Processing
+pydantic==2.5.2
+python-dateutil==2.8.2
+
+# ============================================================================
+# Development Dependencies
+# ============================================================================
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-asyncio==0.21.1
+
+# Code Quality
+black==23.12.0
+flake8==6.1.0
+mypy==1.7.1
+pylint==3.0.3
+isort==5.13.2
+
+# Type Stubs
+types-requests==2.31.0.10
+types-python-dateutil==2.8.19.14
+
+# Pre-commit Hooks
+pre-commit==3.6.0
+
+# ============================================================================
+# Utilities
+# ============================================================================
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Logging
+structlog==23.2.0
+
+# Timezone Support
+pytz==2023.3.post1
+
+# ============================================================================
+# Optional - for local development
+# ============================================================================
+
+# Jupyter for data exploration
+# jupyter==1.0.0
+# ipython==8.18.1
+
+# HTTP debugging
+# httpie==3.2.2
