@@ -9,6 +9,7 @@ import logging
 from typing import Dict, Any, Optional
 from datetime import datetime
 import json
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -457,7 +458,7 @@ def record_webhook_delivery(
     Records webhook delivery for tracking and debugging.
     
     Args:
-        notification_id: Terminal49 notification ID
+        notification_id: Terminal49 notification ID (will generate UUID if invalid)
         event_type: Event type
         payload: Raw webhook payload
         processing_status: Status (received, processing, completed, failed)
@@ -468,6 +469,18 @@ def record_webhook_delivery(
         Webhook delivery UUID
     """
     cursor = conn.cursor()
+    
+    # Validate and sanitize notification_id to ensure it's a valid UUID
+    validated_notification_id = _validate_or_generate_uuid(notification_id)
+    
+    if validated_notification_id != notification_id:
+        logger.warning(
+            "Invalid notification_id format, generated UUID",
+            extra={
+                'original_notification_id': notification_id,
+                'generated_uuid': validated_notification_id
+            }
+        )
     
     query = """
         INSERT INTO webhook_deliveries (
@@ -500,7 +513,7 @@ def record_webhook_delivery(
     """
     
     params = {
-        'notification_id': notification_id,
+        'notification_id': validated_notification_id,
         'event_type': event_type,
         'processing_status': processing_status,
         'processing_error': processing_error,
@@ -533,6 +546,28 @@ def record_webhook_delivery(
             exc_info=True
         )
         raise
+
+
+def _validate_or_generate_uuid(value: Optional[str]) -> str:
+    """
+    Validates if a string is a valid UUID, generates one if not.
+    
+    Args:
+        value: String to validate as UUID
+        
+    Returns:
+        Valid UUID string (original if valid, generated if not)
+    """
+    if not value:
+        return str(uuid.uuid4())
+    
+    try:
+        # Try to parse as UUID to validate format
+        uuid.UUID(value)
+        return value
+    except (ValueError, AttributeError):
+        # Invalid UUID format, generate a new one
+        return str(uuid.uuid4())
 
 
 def _parse_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]:

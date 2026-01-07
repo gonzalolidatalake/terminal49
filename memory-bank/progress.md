@@ -41,6 +41,8 @@ This file tracks the project's progress using a task list format.
 *   Terraform configuration updated
 *   Deployment documentation (PHASE3_DEPLOYMENT.md)
 *   Function README and completion summary
+*   **2026-01-06 19:20:39** - Fixed 403 authentication error: Added Eventarc IAM permissions for Cloud Run service invocation
+*   **2026-01-06 19:50:00** - Fixed BigQuery JSON insertion error: Serialized payload to JSON string and added missing `processing_status` required field in `bigquery_archiver.py`
 
 ## Current Tasks
 

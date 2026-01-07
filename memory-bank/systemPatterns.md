@@ -21,6 +21,14 @@ It is optional, but recommended to be updated as the project evolves.
 *   **Upsert Pattern**: Use upsert operations for entity tables (shipments, containers) to handle updates
 *   **Append-Only Events**: Events table uses append-only pattern for audit trail
 
+## Cloud Functions Gen 2 Patterns
+
+*   **Eventarc Integration**: Cloud Functions Gen 2 with Pub/Sub triggers use Eventarc under the hood
+*   **Cloud Run Foundation**: Gen 2 functions run on Cloud Run, requiring Cloud Run IAM permissions
+*   **IAM for Pub/Sub Triggers**: Eventarc service account needs `roles/run.invoker` on the Cloud Run service
+*   **Automatic Subscriptions**: Eventarc creates push subscriptions automatically; don't create manual pull subscriptions
+*   **Service Account Pattern**: Use `service-{PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com` for Pub/Sub triggers
+
 ## Testing Patterns
 
 *   **Unit Tests**: Required for all business logic

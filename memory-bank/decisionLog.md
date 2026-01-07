@@ -129,3 +129,31 @@ This file records architectural and implementation decisions using a list format
     - Rationale: Matches Phase 3 requirements, sufficient for database operations and BigQuery writes
     - Implementation: Configured in Terraform variables
     - Monitoring: Will adjust based on actual performance metrics in Phase 4
+
+*   **2026-01-06 19:20:39** - Fixed Event Processor 403 Authentication Error: Eventarc IAM Permissions
+    - Decision: Grant Eventarc service account `roles/run.invoker` permission on Cloud Run service
+    - Problem: Event processor failing with 403 "not authenticated" errors when Eventarc tried to invoke it
+    - Root Cause: Cloud Functions Gen 2 with Pub/Sub triggers use Eventarc, which creates push subscriptions to Cloud Run services. The Eventarc service account (`service-{PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com`) lacked permission to invoke the Cloud Run service
+    - Implementation: Updated `infrastructure/terraform/modules/cloud_function/main.tf` to add `google_cloud_run_service_iam_member` resource for Pub/Sub-triggered functions
+    - Key Learning: Cloud Functions Gen 2 = Cloud Run + Eventarc. IAM permissions must be set on the Cloud Run service, not just the Cloud Function
+    - Impact: Event processor now successfully processes webhook events from Pub/Sub
+    - Prevention: Terraform now automatically grants correct permissions for all Pub/Sub-triggered functions
+
+*   **2026-01-06 19:50:00** - Fixed BigQuery JSON Type Insertion Error: Payload Serialization and Missing Required Field
+    - Decision: Serialize payload dict to JSON string and add missing `processing_status` required field
+    - Problem: BigQuery insert failing with error "This field: payload is not a record" causing 500 errors in production
+    - Root Cause Analysis: Two issues identified:
+        1. BigQuery JSON type requires payload to be a JSON string, not a Python dict when using `insert_rows_json()`
+        2. Missing required field `processing_status` in the row data being inserted
+    - Investigation Process:
+        - Examined error logs showing consistent BigQuery insertion failures
+        - Compared Terraform schema definition (JSON type) with actual deployed schema
+        - Analyzed `bigquery_archiver.py` code and identified payload was passed as dict without serialization
+        - Discovered `processing_status` (REQUIRED field) was not included in row data
+    - Implementation: Updated `functions/event_processor/bigquery_archiver.py`:
+        - Added `import json as json_module` and `json_module.dumps(payload)` to serialize payload dict to JSON string
+        - Added `'processing_status': 'received'` to row data to satisfy required field constraint
+        - Added debug logging to track payload type and row structure
+    - Impact: Event processor now successfully archives all events to BigQuery, zero insertion errors
+    - Validation: Verified with production logs showing "Raw event archived to BigQuery" and "Event processed successfully" messages, queried BigQuery table confirming data is being written correctly with extractable JSON fields
+    - Key Learning: BigQuery JSON type behavior differs from RECORD type - requires string serialization for `insert_rows_json()` method, and all REQUIRED fields must be present even if they have default values in schema

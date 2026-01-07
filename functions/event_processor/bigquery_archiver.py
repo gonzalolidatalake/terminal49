@@ -62,7 +62,7 @@ def archive_raw_event(
     
     # Get configuration
     project_id = os.environ.get('GCP_PROJECT_ID')
-    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', 'terminal49_webhooks')
+    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', os.environ.get('BIGQUERY_DATASET', 'terminal49_raw_events'))
     table_id = 'raw_events_archive'
     
     if not project_id:
@@ -72,15 +72,30 @@ def archive_raw_event(
     table_ref = f"{project_id}.{dataset_id}.{table_id}"
     
     # Prepare row for insertion
+    # Note: BigQuery JSON type requires the payload to be serialized as a JSON string
+    import json as json_module
+    
     row = {
         'event_id': notification_id or request_id,
         'received_at': datetime.utcnow().isoformat(),
         'event_type': event_type,
-        'payload': payload,  # BigQuery handles JSON serialization
+        'payload': json_module.dumps(payload),  # Serialize dict to JSON string for BigQuery JSON type
         'signature_valid': signature_valid,
         'request_id': request_id,
+        'processing_status': 'received',  # Required field - set initial status
         'processing_duration_ms': None  # Will be updated later if needed
     }
+    
+    # Log the row structure for debugging
+    logger.debug(
+        "Preparing BigQuery insert",
+        extra={
+            'request_id': request_id,
+            'notification_id': notification_id,
+            'payload_type': type(payload).__name__,
+            'row_keys': list(row.keys())
+        }
+    )
     
     try:
         # Streaming insert (immediate availability, higher cost)
@@ -154,7 +169,7 @@ def update_processing_duration(
     client = _get_bigquery_client()
     
     project_id = os.environ.get('GCP_PROJECT_ID')
-    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', 'terminal49_webhooks')
+    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', os.environ.get('BIGQUERY_DATASET', 'terminal49_raw_events'))
     table_id = 'raw_events_archive'
     
     if not project_id:
@@ -218,7 +233,7 @@ def query_raw_events(
     client = _get_bigquery_client()
     
     project_id = os.environ.get('GCP_PROJECT_ID')
-    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', 'terminal49_webhooks')
+    dataset_id = os.environ.get('BIGQUERY_DATASET_ID', os.environ.get('BIGQUERY_DATASET', 'terminal49_raw_events'))
     table_id = 'raw_events_archive'
     
     # Build query with filters

@@ -194,6 +194,12 @@ variable "supabase_db_host" {
   default     = "db.srordjhkcvyfyvepzrzp.supabase.co"
 }
 
+variable "supabase_db_port" {
+  description = "Supabase database port"
+  type        = string
+  default     = "5432"
+}
+
 variable "supabase_db_name" {
   description = "Supabase database name"
   type        = string

@@ -199,6 +199,7 @@ module "event_processor" {
   environment_variables = {
     GCP_PROJECT_ID           = var.project_id
     BIGQUERY_DATASET_ID      = var.bigquery_dataset_id
+    BIGQUERY_DATASET         = var.bigquery_dataset_id  # Backward compatibility
     SUPABASE_DB_HOST         = var.supabase_db_host
     SUPABASE_DB_PORT         = var.supabase_db_port
     SUPABASE_DB_NAME         = var.supabase_db_name

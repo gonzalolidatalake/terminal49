@@ -122,3 +122,30 @@ resource "google_cloudfunctions2_function_iam_member" "invoker" {
 
   depends_on = [google_cloudfunctions2_function.function]
 }
+
+# ============================================================================
+# IAM Policy for Pub/Sub Functions (Allow Eventarc to Invoke Cloud Run)
+# ============================================================================
+# Note: Cloud Functions Gen 2 uses Eventarc for Pub/Sub triggers, which creates
+# a push subscription to the underlying Cloud Run service. We need to grant
+# the Eventarc service account permission to invoke the Cloud Run service.
+
+resource "google_cloud_run_service_iam_member" "eventarc_invoker" {
+  count = local.is_pubsub_trigger ? 1 : 0
+
+  project  = var.project_id
+  location = var.region
+  service  = google_cloudfunctions2_function.function.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-eventarc.iam.gserviceaccount.com"
+
+  depends_on = [google_cloudfunctions2_function.function]
+}
+
+# ============================================================================
+# Data Source for Project Number (needed for service accounts)
+# ============================================================================
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
