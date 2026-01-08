@@ -157,3 +157,29 @@ This file records architectural and implementation decisions using a list format
     - Impact: Event processor now successfully archives all events to BigQuery, zero insertion errors
     - Validation: Verified with production logs showing "Raw event archived to BigQuery" and "Event processed successfully" messages, queried BigQuery table confirming data is being written correctly with extractable JSON fields
     - Key Learning: BigQuery JSON type behavior differs from RECORD type - requires string serialization for `insert_rows_json()` method, and all REQUIRED fields must be present even if they have default values in schema
+
+*   **2026-01-08 17:26:36** - Fixed BigQuery Empty Fields: Implemented Comprehensive Field Extraction from Terminal49 Payloads
+    - Decision: Add field extraction logic to parse Terminal49 webhook payloads and populate all BigQuery columns
+    - Problem: BigQuery table `raw_events_archive` had 24 columns defined but only 8 were being populated. 16 fields were NULL for all 809 rows including: notification_id, event_timestamp, event_category, payload_size_bytes, shipment_id, container_id, bill_of_lading, container_number
+    - Root Cause: The `archive_raw_event()` function only inserted 8 hardcoded fields with no logic to extract data from Terminal49 payload structure
+    - Investigation Process:
+        - Queried BigQuery showing 809/809 rows with NULL values for extracted fields
+        - Examined Terminal49 webhook payload structure (JSON:API format with data/included sections)
+        - Identified payload contains: notification_id in `data.id`, timestamp in `data.attributes.created_at`, shipment/container data in `included[]` array
+        - Confirmed root cause: Missing field extraction logic (Hypothesis 1: Field mapping mismatch)
+    - Implementation: Updated `functions/event_processor/bigquery_archiver.py`:
+        - Created `_extract_payload_fields()` function (131 lines) to parse Terminal49 JSON:API structure
+        - Extracts notification_id from `data.id`
+        - Extracts event_timestamp from `data.attributes.created_at`
+        - Derives event_category from event_type prefix (container/shipment/tracking_request)
+        - Extracts shipment_id, container_id from `included[]` array by type
+        - Extracts bill_of_lading from shipment attributes
+        - Extracts container_number from container attributes
+        - Handles transport_event relationships to find container/shipment references
+        - Calculates payload_size_bytes from JSON string length
+        - Enhanced function signature with optional parameters: signature_header, source_ip, user_agent
+        - Updated row insertion to populate all 24 fields with extracted data or NULL
+    - Deployment: Successfully deployed via Terraform at 2026-01-08 17:26:36 UTC (1 added, 1 changed, 1 destroyed)
+    - Impact: All new webhook events will have complete field extraction. Existing 809 rows remain with NULL values (processed with old code)
+    - Key Learning: Always implement field extraction logic when schema defines more columns than initially populated. Terminal49 uses JSON:API format requiring traversal of data/included structure
+    - Documentation: Created comprehensive diagnostic report in `BIGQUERY_FIELD_EXTRACTION_FIX.md`

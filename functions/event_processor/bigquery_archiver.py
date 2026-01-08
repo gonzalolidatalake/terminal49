@@ -35,12 +35,149 @@ def _get_bigquery_client():
     return _bigquery_client
 
 
+def _extract_payload_fields(payload: Dict[str, Any], event_type: str) -> Dict[str, Any]:
+    """
+    Extracts key fields from Terminal49 webhook payload for BigQuery archival.
+    
+    Terminal49 webhook structure:
+    {
+        "data": {
+            "id": "notification_id",
+            "attributes": {
+                "event": "event_type",
+                "created_at": "timestamp"
+            },
+            "relationships": {
+                "reference_object": {"data": {"id": "...", "type": "..."}}
+            }
+        },
+        "included": [
+            {"type": "shipment", "id": "...", "attributes": {...}},
+            {"type": "container", "id": "...", "attributes": {...}},
+            {"type": "transport_event", "id": "...", "attributes": {...}}
+        ]
+    }
+    
+    Args:
+        payload: Raw webhook payload dictionary
+        event_type: Event type string
+        
+    Returns:
+        Dictionary with extracted fields
+    """
+    extracted = {
+        'event_timestamp': None,
+        'event_category': None,
+        'shipment_id': None,
+        'container_id': None,
+        'tracking_request_id': None,
+        'bill_of_lading': None,
+        'container_number': None
+    }
+    
+    try:
+        # Extract notification data
+        data = payload.get('data', {})
+        
+        # Extract event timestamp from attributes.created_at
+        attributes = data.get('attributes', {})
+        created_at = attributes.get('created_at')
+        if created_at:
+            extracted['event_timestamp'] = created_at
+        
+        # Determine event category from event type
+        if event_type:
+            if event_type.startswith('container.'):
+                extracted['event_category'] = 'container'
+            elif event_type.startswith('shipment.'):
+                extracted['event_category'] = 'shipment'
+            elif event_type.startswith('tracking_request.'):
+                extracted['event_category'] = 'tracking_request'
+            else:
+                extracted['event_category'] = 'other'
+        
+        # Extract IDs from included objects
+        included = payload.get('included', [])
+        for item in included:
+            item_type = item.get('type')
+            item_id = item.get('id')
+            item_attrs = item.get('attributes', {})
+            
+            if item_type == 'shipment' and item_id:
+                extracted['shipment_id'] = item_id
+                # Extract bill of lading from shipment attributes
+                bol = item_attrs.get('bill_of_lading_number') or item_attrs.get('normalized_number')
+                if bol:
+                    extracted['bill_of_lading'] = bol
+            
+            elif item_type == 'container' and item_id:
+                extracted['container_id'] = item_id
+                # Extract container number from container attributes
+                container_num = item_attrs.get('number')
+                if container_num:
+                    extracted['container_number'] = container_num
+            
+            elif item_type == 'tracking_request' and item_id:
+                extracted['tracking_request_id'] = item_id
+        
+        # If no container/shipment in included, check relationships
+        relationships = data.get('relationships', {})
+        
+        # Check reference_object for transport_event, container, or shipment
+        ref_obj = relationships.get('reference_object', {}).get('data', {})
+        if ref_obj:
+            ref_type = ref_obj.get('type')
+            ref_id = ref_obj.get('id')
+            
+            # For transport events, we need to look in included for the actual container/shipment
+            if ref_type == 'transport_event':
+                # Find the transport_event in included to get container/shipment references
+                for item in included:
+                    if item.get('type') == 'transport_event' and item.get('id') == ref_id:
+                        te_relationships = item.get('relationships', {})
+                        
+                        # Extract container ID from transport event
+                        container_ref = te_relationships.get('container', {}).get('data', {})
+                        if container_ref and not extracted['container_id']:
+                            extracted['container_id'] = container_ref.get('id')
+                        
+                        # Extract shipment ID from transport event
+                        shipment_ref = te_relationships.get('shipment', {}).get('data', {})
+                        if shipment_ref and not extracted['shipment_id']:
+                            extracted['shipment_id'] = shipment_ref.get('id')
+                        
+                        break
+        
+        logger.debug(
+            "Extracted payload fields",
+            extra={
+                'event_type': event_type,
+                'extracted_fields': {k: v for k, v in extracted.items() if v is not None}
+            }
+        )
+        
+    except Exception as e:
+        logger.warning(
+            "Failed to extract some payload fields",
+            extra={
+                'event_type': event_type,
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        )
+    
+    return extracted
+
+
 def archive_raw_event(
     payload: Dict[str, Any],
     event_type: str,
     request_id: str,
     notification_id: Optional[str] = None,
-    signature_valid: bool = True
+    signature_valid: bool = True,
+    signature_header: Optional[str] = None,
+    source_ip: Optional[str] = None,
+    user_agent: Optional[str] = None
 ) -> None:
     """
     Archives raw webhook event to BigQuery.
@@ -54,6 +191,9 @@ def archive_raw_event(
         request_id: Request correlation ID
         notification_id: Terminal49 notification ID (for deduplication)
         signature_valid: Whether webhook signature was valid
+        signature_header: Original webhook signature header
+        source_ip: Source IP address of webhook request
+        user_agent: User-Agent header from request
         
     Raises:
         google.api_core.exceptions.GoogleAPIError: On BigQuery errors
@@ -71,19 +211,42 @@ def archive_raw_event(
     # Construct table reference
     table_ref = f"{project_id}.{dataset_id}.{table_id}"
     
+    # Extract fields from Terminal49 payload
+    extracted_fields = _extract_payload_fields(payload, event_type)
+    
     # Prepare row for insertion
     # Note: BigQuery JSON type requires the payload to be serialized as a JSON string
     import json as json_module
     
+    # Calculate payload size
+    payload_json = json_module.dumps(payload)
+    payload_size = len(payload_json.encode('utf-8'))
+    
     row = {
         'event_id': notification_id or request_id,
+        'notification_id': notification_id,
         'received_at': datetime.utcnow().isoformat(),
+        'event_timestamp': extracted_fields.get('event_timestamp'),
         'event_type': event_type,
-        'payload': json_module.dumps(payload),  # Serialize dict to JSON string for BigQuery JSON type
+        'event_category': extracted_fields.get('event_category'),
+        'payload': payload_json,  # Serialize dict to JSON string for BigQuery JSON type
+        'payload_size_bytes': payload_size,
         'signature_valid': signature_valid,
-        'request_id': request_id,
+        'signature_header': signature_header,
         'processing_status': 'received',  # Required field - set initial status
-        'processing_duration_ms': None  # Will be updated later if needed
+        'processing_duration_ms': None,  # Will be updated later if needed
+        'processing_error': None,
+        'processed_at': None,
+        'request_id': request_id,
+        'source_ip': source_ip,
+        'user_agent': user_agent,
+        'shipment_id': extracted_fields.get('shipment_id'),
+        'container_id': extracted_fields.get('container_id'),
+        'tracking_request_id': extracted_fields.get('tracking_request_id'),
+        'bill_of_lading': extracted_fields.get('bill_of_lading'),
+        'container_number': extracted_fields.get('container_number'),
+        'reprocessing_count': 0,
+        'last_reprocessed_at': None
     }
     
     # Log the row structure for debugging
