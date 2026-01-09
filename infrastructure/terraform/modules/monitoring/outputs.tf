@@ -10,10 +10,12 @@ output "webhook_error_rate_alert_id" {
   value       = google_monitoring_alert_policy.webhook_error_rate.id
 }
 
-output "signature_validation_failures_alert_id" {
-  description = "ID of the signature validation failures alert policy"
-  value       = google_monitoring_alert_policy.signature_validation_failures.id
-}
+# NOTE: Commented out because the alert policy is commented out in main.tf
+# Uncomment this output when you uncomment the alert policy
+# output "signature_validation_failures_alert_id" {
+#   description = "ID of the signature validation failures alert policy"
+#   value       = google_monitoring_alert_policy.signature_validation_failures.id
+# }
 
 output "event_processing_latency_alert_id" {
   description = "ID of the event processing latency alert policy"
@@ -30,7 +32,9 @@ output "function_error_rate_alert_id" {
   value       = google_monitoring_alert_policy.function_error_rate.id
 }
 
-output "database_connection_failures_alert_id" {
-  description = "ID of the database connection failures alert policy"
-  value       = google_monitoring_alert_policy.database_connection_failures.id
-}
+# NOTE: Commented out because the alert policy is commented out in main.tf
+# Uncomment this output when you uncomment the alert policy
+# output "database_connection_failures_alert_id" {
+#   description = "ID of the database connection failures alert policy"
+#   value       = google_monitoring_alert_policy.database_connection_failures.id
+# }

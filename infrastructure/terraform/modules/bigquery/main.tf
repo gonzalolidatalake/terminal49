@@ -2,6 +2,15 @@
 # Creates BigQuery datasets and tables for Terminal49 webhook data
 
 # ============================================================================
+# Data Sources
+# ============================================================================
+
+# Get project information to construct service account names
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+# ============================================================================
 # BigQuery Dataset
 # ============================================================================
 
@@ -450,7 +459,106 @@ resource "google_bigquery_table" "processing_metrics" {
 }
 
 # ============================================================================
+# BigQuery Scheduled Query for Processing Metrics
+# ============================================================================
+#
+# NOTE: BigQuery scheduled queries are currently DISABLED due to permission requirements.
+# The scheduled query feature requires the deploying user to have iam.serviceAccounts.actAs
+# permission on the BigQuery Data Transfer service account, which may not be available
+# in all deployment environments.
+#
+# ALTERNATIVE APPROACHES:
+# 1. Run the aggregation query manually or via Cloud Scheduler + Cloud Function
+# 2. Have an admin grant actAs permission and uncomment the resources below
+# 3. Use a custom service account with appropriate permissions
+#
+# To manually populate metrics, run this query in BigQuery:
+# INSERT INTO `{project}.{dataset}.processing_metrics`
+# SELECT
+#   TIMESTAMP_TRUNC(received_at, HOUR) as metric_timestamp,
+#   DATE(received_at) as metric_date,
+#   EXTRACT(HOUR FROM received_at) as metric_hour,
+#   event_type,
+#   event_category,
+#   COUNT(*) as total_events,
+#   SUM(CASE WHEN processing_status = 'processed' THEN 1 ELSE 0 END) as successful_events,
+#   SUM(CASE WHEN processing_status = 'failed' THEN 1 ELSE 0 END) as failed_events,
+#   AVG(processing_duration_ms) as avg_processing_duration_ms,
+#   APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(50)] as p50_processing_duration_ms,
+#   APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(95)] as p95_processing_duration_ms,
+#   APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(99)] as p99_processing_duration_ms,
+#   MAX(processing_duration_ms) as max_processing_duration_ms,
+#   AVG(payload_size_bytes) as avg_payload_size_bytes,
+#   SUM(payload_size_bytes) as total_payload_bytes,
+#   SUM(CASE WHEN signature_valid = false THEN 1 ELSE 0 END) as signature_validation_failures,
+#   CURRENT_TIMESTAMP() as calculated_at
+# FROM `{project}.{dataset}.raw_events_archive`
+# WHERE TIMESTAMP_TRUNC(received_at, HOUR) = TIMESTAMP_TRUNC(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR), HOUR)
+# GROUP BY metric_timestamp, metric_date, metric_hour, event_type, event_category;
+
+# COMMENTED OUT - Requires actAs permission
+# resource "google_bigquery_data_transfer_config" "processing_metrics_hourly" {
+#   display_name           = "Hourly Processing Metrics Aggregation"
+#   location               = var.region
+#   data_source_id         = "scheduled_query"
+#   schedule               = "every hour"
+#   destination_dataset_id = google_bigquery_dataset.terminal49_raw_events.dataset_id
+#   service_account_name   = "service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+#
+#   params = {
+#     query = <<-SQL
+#       INSERT INTO `${var.project_id}.${var.dataset_id}.${var.metrics_table_id}`
+#       SELECT
+#         TIMESTAMP_TRUNC(received_at, HOUR) as metric_timestamp,
+#         DATE(received_at) as metric_date,
+#         EXTRACT(HOUR FROM received_at) as metric_hour,
+#         event_type,
+#         event_category,
+#         COUNT(*) as total_events,
+#         SUM(CASE WHEN processing_status = 'processed' THEN 1 ELSE 0 END) as successful_events,
+#         SUM(CASE WHEN processing_status = 'failed' THEN 1 ELSE 0 END) as failed_events,
+#         AVG(processing_duration_ms) as avg_processing_duration_ms,
+#         APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(50)] as p50_processing_duration_ms,
+#         APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(95)] as p95_processing_duration_ms,
+#         APPROX_QUANTILES(processing_duration_ms, 100)[OFFSET(99)] as p99_processing_duration_ms,
+#         MAX(processing_duration_ms) as max_processing_duration_ms,
+#         AVG(payload_size_bytes) as avg_payload_size_bytes,
+#         SUM(payload_size_bytes) as total_payload_bytes,
+#         SUM(CASE WHEN signature_valid = false THEN 1 ELSE 0 END) as signature_validation_failures,
+#         CURRENT_TIMESTAMP() as calculated_at
+#       FROM `${var.project_id}.${var.dataset_id}.raw_events_archive`
+#       WHERE TIMESTAMP_TRUNC(received_at, HOUR) = TIMESTAMP_TRUNC(TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR), HOUR)
+#       GROUP BY metric_timestamp, metric_date, metric_hour, event_type, event_category
+#     SQL
+#   }
+#
+#   depends_on = [
+#     google_bigquery_table.processing_metrics,
+#     google_bigquery_table.raw_events_archive,
+#     google_bigquery_dataset_iam_member.scheduled_query_editor,
+#     google_project_iam_member.bigquery_transfer_service_agent
+#   ]
+# }
+
+# ============================================================================
 # IAM Bindings
 # ============================================================================
-# NOTE: IAM bindings are now managed in the service_accounts module
+
+# COMMENTED OUT - Only needed if scheduled query is enabled
+# resource "google_bigquery_dataset_iam_member" "scheduled_query_editor" {
+#   dataset_id = google_bigquery_dataset.terminal49_raw_events.dataset_id
+#   role       = "roles/bigquery.dataEditor"
+#   member     = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+#
+#   depends_on = [google_bigquery_dataset.terminal49_raw_events]
+# }
+
+# COMMENTED OUT - Only needed if scheduled query is enabled
+# resource "google_project_iam_member" "bigquery_transfer_service_agent" {
+#   project = var.project_id
+#   role    = "roles/bigquerydatatransfer.serviceAgent"
+#   member  = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com"
+# }
+
+# NOTE: Additional IAM bindings are managed in the service_accounts module
 # to avoid circular dependencies and duplicate bindings

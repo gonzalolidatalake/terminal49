@@ -124,7 +124,7 @@ module "bigquery" {
 
   event_processor_sa_email = local.event_processor_sa_email
 
-  partition_expiration_days = var.bigquery_partition_expiration_days
+  partition_expiration_days  = var.bigquery_partition_expiration_days
   delete_contents_on_destroy = var.environment != "production"
 
   labels = local.common_labels
@@ -149,10 +149,10 @@ module "webhook_receiver" {
   service_account_email = local.webhook_receiver_sa_email
 
   # HTTP trigger configuration
-  trigger_type = "http"
-  https_trigger_security_level = "SECURE_ALWAYS"
-  ingress_settings = "ALLOW_ALL"
-  allow_unauthenticated_invocations = false  # Private function - auth handled by IT team
+  trigger_type                      = "http"
+  https_trigger_security_level      = "SECURE_ALWAYS"
+  ingress_settings                  = "ALLOW_ALL"
+  allow_unauthenticated_invocations = false # Private function - auth handled by IT team
 
   # Environment variables
   environment_variables = {
@@ -165,10 +165,10 @@ module "webhook_receiver" {
   }
 
   # Resource allocation
-  available_memory_mb   = var.webhook_receiver_memory_mb
-  timeout_seconds       = var.webhook_receiver_timeout_seconds
-  max_instance_count    = var.webhook_receiver_max_instances
-  min_instance_count    = var.webhook_receiver_min_instances
+  available_memory_mb = var.webhook_receiver_memory_mb
+  timeout_seconds     = var.webhook_receiver_timeout_seconds
+  max_instance_count  = var.webhook_receiver_max_instances
+  min_instance_count  = var.webhook_receiver_min_instances
 
   labels = local.common_labels
 
@@ -197,51 +197,121 @@ module "event_processor" {
 
   # Environment variables
   environment_variables = {
-    GCP_PROJECT_ID           = var.project_id
-    BIGQUERY_DATASET_ID      = var.bigquery_dataset_id
-    BIGQUERY_DATASET         = var.bigquery_dataset_id  # Backward compatibility
-    SUPABASE_DB_HOST         = var.supabase_db_host
-    SUPABASE_DB_PORT         = var.supabase_db_port
-    SUPABASE_DB_NAME         = var.supabase_db_name
-    SUPABASE_DB_USER         = var.supabase_db_user
-    SUPABASE_DB_PASSWORD     = var.supabase_db_password
-    LOG_LEVEL                = var.log_level
-    ENVIRONMENT              = var.environment
+    GCP_PROJECT_ID       = var.project_id
+    BIGQUERY_DATASET_ID  = var.bigquery_dataset_id
+    BIGQUERY_DATASET     = var.bigquery_dataset_id # Backward compatibility
+    SUPABASE_DB_HOST     = var.supabase_db_host
+    SUPABASE_DB_PORT     = var.supabase_db_port
+    SUPABASE_DB_NAME     = var.supabase_db_name
+    SUPABASE_DB_USER     = var.supabase_db_user
+    SUPABASE_DB_PASSWORD = var.supabase_db_password
+    LOG_LEVEL            = var.log_level
+    ENVIRONMENT          = var.environment
   }
 
   # Resource allocation (Phase 3 requirements: 512MB, 120s timeout)
-  available_memory_mb   = var.event_processor_memory_mb
-  timeout_seconds       = var.event_processor_timeout_seconds
-  max_instance_count    = var.event_processor_max_instances
-  min_instance_count    = var.event_processor_min_instances
+  available_memory_mb = var.event_processor_memory_mb
+  timeout_seconds     = var.event_processor_timeout_seconds
+  max_instance_count  = var.event_processor_max_instances
+  min_instance_count  = var.event_processor_min_instances
 
   labels = local.common_labels
 
   depends_on = [module.pubsub, module.bigquery, module.service_accounts]
 }
 
+# Cloud Functions Module - Supabase Archiver
+module "supabase_archiver" {
+  source = "./modules/cloud_function"
+
+  project_id  = var.project_id
+  region      = var.region
+  environment = var.environment
+
+  function_name        = "${var.function_name_prefix}-supabase-archiver-${var.environment}"
+  function_description = "Archives old Supabase events to BigQuery for long-term storage"
+  entry_point          = "archive_old_events"
+  runtime              = var.function_runtime
+  source_dir           = "${path.root}/../../functions/supabase_archiver"
+
+  service_account_email = local.event_processor_sa_email
+
+  # HTTP trigger configuration (invoked by Cloud Scheduler)
+  trigger_type                      = "http"
+  https_trigger_security_level      = "SECURE_ALWAYS"
+  ingress_settings                  = "ALLOW_INTERNAL_ONLY"
+  allow_unauthenticated_invocations = false
+
+  # Environment variables
+  environment_variables = {
+    SUPABASE_URL         = var.supabase_url
+    SUPABASE_SERVICE_KEY = var.supabase_service_key
+    GCP_PROJECT_ID       = var.project_id
+    BIGQUERY_DATASET_ID  = var.bigquery_dataset_id
+    RETENTION_DAYS       = "90"
+    BATCH_SIZE           = "1000"
+    DELETE_AFTER_ARCHIVE = "false" # Set to "true" to delete after archival
+    LOG_LEVEL            = var.log_level
+    ENVIRONMENT          = var.environment
+  }
+
+  # Resource allocation
+  available_memory_mb = 512
+  timeout_seconds     = 540 # 9 minutes
+  max_instance_count  = 1
+  min_instance_count  = 0
+
+  labels = local.common_labels
+
+  depends_on = [module.bigquery, module.service_accounts]
+}
+
+# Cloud Scheduler Job - Supabase Archival
+resource "google_cloud_scheduler_job" "supabase_archival" {
+  name             = "supabase-archival-daily-${var.environment}"
+  description      = "Daily archival of old Supabase events to BigQuery"
+  schedule         = "0 2 * * *" # Daily at 2 AM UTC
+  time_zone        = "UTC"
+  attempt_deadline = "600s"
+  region           = var.region
+
+  http_target {
+    uri         = module.supabase_archiver.function_url
+    http_method = "POST"
+
+    oidc_token {
+      service_account_email = local.event_processor_sa_email
+    }
+  }
+
+  retry_config {
+    retry_count = 3
+  }
+
+  depends_on = [module.supabase_archiver]
+}
+
 # Monitoring Module
-# TODO: Uncomment when event_processor function is implemented
-# module "monitoring" {
-#   source = "./modules/monitoring"
-#
-#   project_id  = var.project_id
-#   environment = var.environment
-#
-#   webhook_receiver_function_name = local.webhook_receiver_name
-#   event_processor_function_name  = local.event_processor_name
-#
-#   notification_channels = var.notification_channels
-#
-#   # Alert thresholds
-#   webhook_error_rate_threshold     = var.webhook_error_rate_threshold
-#   event_processing_latency_threshold = var.event_processing_latency_threshold
-#   dlq_depth_threshold              = var.dlq_depth_threshold
-#
-#   labels = local.common_labels
-#
-#   depends_on = [module.webhook_receiver, module.event_processor]
-# }
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  project_id  = var.project_id
+  environment = var.environment
+
+  webhook_receiver_function_name = local.webhook_receiver_name
+  event_processor_function_name  = local.event_processor_name
+
+  notification_channels = var.notification_channels
+
+  # Alert thresholds
+  webhook_error_rate_threshold       = var.webhook_error_rate_threshold
+  event_processing_latency_threshold = var.event_processing_latency_threshold
+  dlq_depth_threshold                = var.dlq_depth_threshold
+
+  labels = local.common_labels
+
+  depends_on = [module.webhook_receiver, module.event_processor]
+}
 
 # ============================================================================
 # Outputs

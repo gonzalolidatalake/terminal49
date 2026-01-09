@@ -41,39 +41,42 @@ resource "google_monitoring_alert_policy" "webhook_error_rate" {
 # ============================================================================
 # Alert Policy: Signature Validation Failures
 # ============================================================================
+# NOTE: Commented out until log-based metric is created by application code
+# The metric logging.googleapis.com/user/signature_validation_failed must exist
+# before this alert policy can be created. Uncomment after first deployment.
 
-resource "google_monitoring_alert_policy" "signature_validation_failures" {
-  display_name = "[${upper(var.environment)}] Terminal49 Signature Validation Failures"
-  project      = var.project_id
-  combiner     = "OR"
-
-  conditions {
-    display_name = "Signature validation failures > 10/hour"
-
-    condition_threshold {
-      filter          = "resource.type=\"cloud_function\" AND resource.labels.function_name=\"${var.webhook_receiver_function_name}\" AND metric.type=\"logging.googleapis.com/user/signature_validation_failed\""
-      duration        = "300s"
-      comparison      = "COMPARISON_GT"
-      threshold_value = 10
-
-      aggregations {
-        alignment_period   = "3600s"
-        per_series_aligner = "ALIGN_SUM"
-      }
-    }
-  }
-
-  notification_channels = var.notification_channels
-
-  alert_strategy {
-    auto_close = "3600s"
-  }
-
-  documentation {
-    content   = "Multiple signature validation failures detected. This may indicate an attack or misconfiguration."
-    mime_type = "text/markdown"
-  }
-}
+# resource "google_monitoring_alert_policy" "signature_validation_failures" {
+#   display_name = "[${upper(var.environment)}] Terminal49 Signature Validation Failures"
+#   project      = var.project_id
+#   combiner     = "OR"
+#
+#   conditions {
+#     display_name = "Signature validation failures > 10/hour"
+#
+#     condition_threshold {
+#       filter          = "resource.type=\"cloud_function\" AND resource.labels.function_name=\"${var.webhook_receiver_function_name}\" AND metric.type=\"logging.googleapis.com/user/signature_validation_failed\""
+#       duration        = "300s"
+#       comparison      = "COMPARISON_GT"
+#       threshold_value = 10
+#
+#       aggregations {
+#         alignment_period   = "3600s"
+#         per_series_aligner = "ALIGN_SUM"
+#       }
+#     }
+#   }
+#
+#   notification_channels = var.notification_channels
+#
+#   alert_strategy {
+#     auto_close = "3600s"
+#   }
+#
+#   documentation {
+#     content   = "Multiple signature validation failures detected. This may indicate an attack or misconfiguration."
+#     mime_type = "text/markdown"
+#   }
+# }
 
 # ============================================================================
 # Alert Policy: Event Processing Latency
@@ -190,39 +193,42 @@ resource "google_monitoring_alert_policy" "function_error_rate" {
 # ============================================================================
 # Alert Policy: Database Connection Failures
 # ============================================================================
+# NOTE: Commented out until log-based metric is created by application code
+# The metric logging.googleapis.com/user/database_connection_failed must exist
+# before this alert policy can be created. Uncomment after first deployment.
 
-resource "google_monitoring_alert_policy" "database_connection_failures" {
-  display_name = "[${upper(var.environment)}] Terminal49 Database Connection Failures"
-  project      = var.project_id
-  combiner     = "OR"
-
-  conditions {
-    display_name = "Database connection failures detected"
-
-    condition_threshold {
-      filter          = "resource.type=\"cloud_function\" AND resource.labels.function_name=\"${var.event_processor_function_name}\" AND metric.type=\"logging.googleapis.com/user/database_connection_failed\""
-      duration        = "300s"
-      comparison      = "COMPARISON_GT"
-      threshold_value = 5
-
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_SUM"
-      }
-    }
-  }
-
-  notification_channels = var.notification_channels
-
-  alert_strategy {
-    auto_close = "1800s"
-  }
-
-  documentation {
-    content   = "Multiple database connection failures detected. Check Supabase connectivity and credentials."
-    mime_type = "text/markdown"
-  }
-}
+# resource "google_monitoring_alert_policy" "database_connection_failures" {
+#   display_name = "[${upper(var.environment)}] Terminal49 Database Connection Failures"
+#   project      = var.project_id
+#   combiner     = "OR"
+#
+#   conditions {
+#     display_name = "Database connection failures detected"
+#
+#     condition_threshold {
+#       filter          = "resource.type=\"cloud_function\" AND resource.labels.function_name=\"${var.event_processor_function_name}\" AND metric.type=\"logging.googleapis.com/user/database_connection_failed\""
+#       duration        = "300s"
+#       comparison      = "COMPARISON_GT"
+#       threshold_value = 5
+#
+#       aggregations {
+#         alignment_period   = "300s"
+#         per_series_aligner = "ALIGN_SUM"
+#       }
+#     }
+#   }
+#
+#   notification_channels = var.notification_channels
+#
+#   alert_strategy {
+#     auto_close = "1800s"
+#   }
+#
+#   documentation {
+#     content   = "Multiple database connection failures detected. Check Supabase connectivity and credentials."
+#     mime_type = "text/markdown"
+#   }
+# }
 
 # ============================================================================
 # Monitoring Dashboard
@@ -231,13 +237,15 @@ resource "google_monitoring_alert_policy" "database_connection_failures" {
 resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
   dashboard_json = jsonencode({
     displayName = "Terminal49 Webhook Infrastructure - ${upper(var.environment)}"
-    
+
     mosaicLayout = {
       columns = 12
-      
+
       tiles = [
         # Webhook Health Section
         {
+          xPos   = 0
+          yPos   = 0
           width  = 6
           height = 4
           widget = {
@@ -258,6 +266,8 @@ resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
           }
         },
         {
+          xPos   = 6
+          yPos   = 0
           width  = 6
           height = 4
           widget = {
@@ -280,6 +290,8 @@ resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
         },
         # Event Processing Section
         {
+          xPos   = 0
+          yPos   = 4
           width  = 6
           height = 4
           widget = {
@@ -300,6 +312,8 @@ resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
           }
         },
         {
+          xPos   = 6
+          yPos   = 4
           width  = 6
           height = 4
           widget = {
@@ -321,6 +335,8 @@ resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
         },
         # Error Tracking Section
         {
+          xPos   = 0
+          yPos   = 8
           width  = 6
           height = 4
           widget = {
@@ -341,6 +357,8 @@ resource "google_monitoring_dashboard" "terminal49_webhook_infrastructure" {
           }
         },
         {
+          xPos   = 6
+          yPos   = 8
           width  = 6
           height = 4
           widget = {

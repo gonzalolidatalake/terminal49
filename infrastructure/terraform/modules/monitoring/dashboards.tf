@@ -8,10 +8,10 @@
 resource "google_monitoring_dashboard" "webhook_health" {
   dashboard_json = jsonencode({
     displayName = "Terminal49 Webhook Health - ${upper(var.environment)}"
-    
+
     mosaicLayout = {
       columns = 12
-      
+
       tiles = [
         # Request Rate
         {
@@ -70,8 +70,8 @@ resource "google_monitoring_dashboard" "webhook_health" {
                       }
                     }
                   }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
+                  plotType       = "LINE"
+                  targetAxis     = "Y1"
                   legendTemplate = "p50"
                 },
                 {
@@ -85,8 +85,8 @@ resource "google_monitoring_dashboard" "webhook_health" {
                       }
                     }
                   }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
+                  plotType       = "LINE"
+                  targetAxis     = "Y1"
                   legendTemplate = "p95"
                 },
                 {
@@ -100,8 +100,8 @@ resource "google_monitoring_dashboard" "webhook_health" {
                       }
                     }
                   }
-                  plotType   = "LINE"
-                  targetAxis = "Y1"
+                  plotType       = "LINE"
+                  targetAxis     = "Y1"
                   legendTemplate = "p99"
                 }
               ]
@@ -112,8 +112,6 @@ resource "google_monitoring_dashboard" "webhook_health" {
               thresholds = [
                 {
                   value = 3000
-                  color = "YELLOW"
-                  direction = "ABOVE"
                   label = "SLA Threshold (3s)"
                 }
               ]
@@ -144,7 +142,7 @@ resource "google_monitoring_dashboard" "webhook_health" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "5xx Errors"
                 },
                 {
@@ -158,7 +156,7 @@ resource "google_monitoring_dashboard" "webhook_health" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "4xx Errors"
                 }
               ]
@@ -201,8 +199,6 @@ resource "google_monitoring_dashboard" "webhook_health" {
               thresholds = [
                 {
                   value = 10
-                  color = "RED"
-                  direction = "ABOVE"
                   label = "Alert Threshold"
                 }
               ]
@@ -323,10 +319,10 @@ resource "google_monitoring_dashboard" "webhook_health" {
 resource "google_monitoring_dashboard" "event_processing" {
   dashboard_json = jsonencode({
     displayName = "Terminal49 Event Processing - ${upper(var.environment)}"
-    
+
     mosaicLayout = {
       columns = 12
-      
+
       tiles = [
         # Pub/Sub Message Age
         {
@@ -361,14 +357,10 @@ resource "google_monitoring_dashboard" "event_processing" {
               thresholds = [
                 {
                   value = 30
-                  color = "YELLOW"
-                  direction = "ABOVE"
                   label = "Warning (30s)"
                 },
                 {
                   value = 60
-                  color = "RED"
-                  direction = "ABOVE"
                   label = "Critical (60s)"
                 }
               ]
@@ -399,7 +391,7 @@ resource "google_monitoring_dashboard" "event_processing" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "p50"
                 },
                 {
@@ -413,7 +405,7 @@ resource "google_monitoring_dashboard" "event_processing" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "p95"
                 },
                 {
@@ -427,7 +419,7 @@ resource "google_monitoring_dashboard" "event_processing" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "p99"
                 }
               ]
@@ -438,8 +430,6 @@ resource "google_monitoring_dashboard" "event_processing" {
               thresholds = [
                 {
                   value = 10000
-                  color = "YELLOW"
-                  direction = "ABOVE"
                   label = "SLA Threshold (10s)"
                 }
               ]
@@ -478,8 +468,6 @@ resource "google_monitoring_dashboard" "event_processing" {
               thresholds = [
                 {
                   value = 100
-                  color = "YELLOW"
-                  direction = "ABOVE"
                   label = "Target (100ms)"
                 }
               ]
@@ -518,8 +506,6 @@ resource "google_monitoring_dashboard" "event_processing" {
               thresholds = [
                 {
                   value = 100
-                  color = "RED"
-                  direction = "ABOVE"
                   label = "Alert Threshold"
                 }
               ]
@@ -702,10 +688,10 @@ resource "google_monitoring_dashboard" "event_processing" {
 resource "google_monitoring_dashboard" "data_quality" {
   dashboard_json = jsonencode({
     displayName = "Terminal49 Data Quality - ${upper(var.environment)}"
-    
+
     mosaicLayout = {
       columns = 12
-      
+
       tiles = [
         # Events by Type (Last 24h)
         {
@@ -862,13 +848,13 @@ resource "google_monitoring_dashboard" "data_quality" {
               }
               thresholds = [
                 {
-                  value = 95
-                  color = "YELLOW"
+                  value     = 95
+                  color     = "YELLOW"
                   direction = "BELOW"
                 },
                 {
-                  value = 90
-                  color = "RED"
+                  value     = 90
+                  color     = "RED"
                   direction = "BELOW"
                 }
               ]
@@ -914,9 +900,23 @@ resource "google_monitoring_dashboard" "data_quality" {
                   filter = "resource.type=\"cloud_function\" AND resource.labels.function_name=\"${var.event_processor_function_name}\" AND metric.type=\"logging.googleapis.com/user/unique_event_types\""
                   aggregation = {
                     alignmentPeriod    = "86400s"
-                    perSer# Cloud Monitoring Dashboards for Terminal49 Webhook Infrastructure
-# Implements Phase 4 requirements with 4 comprehensive dashboards
-# This file completes the dashboard configuration
+                    perSeriesAligner   = "ALIGN_MAX"
+                    crossSeriesReducer = "REDUCE_COUNT"
+                  }
+                }
+              }
+              sparkChartView = {
+                sparkChartType = "SPARK_BAR"
+              }
+            }
+          }
+        }
+      ]
+    }
+  })
+
+  project = var.project_id
+}
 
 # ============================================================================
 # Dashboard 4: Infrastructure
@@ -925,10 +925,10 @@ resource "google_monitoring_dashboard" "data_quality" {
 resource "google_monitoring_dashboard" "infrastructure" {
   dashboard_json = jsonencode({
     displayName = "Terminal49 Infrastructure - ${upper(var.environment)}"
-    
+
     mosaicLayout = {
       columns = 12
-      
+
       tiles = [
         # Cloud Function Invocations
         {
@@ -954,7 +954,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Webhook Receiver"
                 },
                 {
@@ -968,7 +968,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Event Processor"
                 }
               ]
@@ -1003,7 +1003,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Webhook Receiver"
                 },
                 {
@@ -1017,7 +1017,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Event Processor"
                 }
               ]
@@ -1085,7 +1085,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Active Connections"
                 },
                 {
@@ -1099,7 +1099,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Idle Connections"
                 }
               ]
@@ -1167,7 +1167,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Published"
                 },
                 {
@@ -1181,7 +1181,7 @@ resource "google_monitoring_dashboard" "infrastructure" {
                       }
                     }
                   }
-                  plotType = "LINE"
+                  plotType       = "LINE"
                   legendTemplate = "Consumed"
                 }
               ]
