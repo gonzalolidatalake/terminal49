@@ -467,6 +467,10 @@ resource "google_bigquery_table" "processing_metrics" {
 # permission on the BigQuery Data Transfer service account, which may not be available
 # in all deployment environments.
 #
+# ERROR ENCOUNTERED: googleapi: Error 403: Requesting user does not have
+# iam.serviceAccounts.actAs permission to act as service account
+# service-{PROJECT_NUMBER}@gcp-sa-bigquerydatatransfer.iam.gserviceaccount.com
+#
 # ALTERNATIVE APPROACHES:
 # 1. Run the aggregation query manually or via Cloud Scheduler + Cloud Function
 # 2. Have an admin grant actAs permission and uncomment the resources below
