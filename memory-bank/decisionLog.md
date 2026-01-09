@@ -221,3 +221,34 @@ This file records architectural and implementation decisions using a list format
     - Impact: System is now fully production-ready with operational excellence, complete observability, and documented procedures
     - Success Metrics: All Phase 4 requirements met, 100% documentation coverage, 100% monitoring coverage, 100% runbook coverage
     - Key Learning: Production readiness is as important as feature development - monitoring, documentation, and operational procedures are critical for long-term success
+
+*   **2026-01-08 18:33:00** - BigQuery Analytics Infrastructure Implementation: Scheduled Queries and Supabase Archival
+    - Decision: Implement Phase 1 (processing_metrics scheduled query) and Phase 2 (Supabase archiver function) from BIGQUERY_ANALYTICS_IMPLEMENTATION_PLAN.md
+    - Rationale: Enable performance monitoring dashboards and long-term data retention while reducing Supabase storage costs
+    - Phase 1 Implementation:
+        - Added BigQuery Data Transfer Config for hourly processing metrics aggregation
+        - Scheduled query runs every hour at :05 minutes past the hour
+        - Aggregates previous hour's data from raw_events_archive table
+        - Calculates total events, success/failure rates, processing duration percentiles (p50, p95, p99), payload sizes, signature validation failures
+        - Added IAM permission for BigQuery Data Transfer Service (bigquery.dataEditor role)
+        - Cost: ~$0.01/month (negligible)
+    - Phase 2 Implementation:
+        - Created Supabase archiver Cloud Function (functions/supabase_archiver/main.py, 320 lines)
+        - Archives container events older than 90 days from Supabase to BigQuery events_historical table
+        - Configurable retention period (RETENTION_DAYS), batch size (BATCH_SIZE), and optional deletion (DELETE_AFTER_ARCHIVE)
+        - Comprehensive error handling, logging, and statistics reporting
+        - Added Cloud Scheduler job for daily execution at 2 AM UTC
+        - Uses event processor service account with existing BigQuery permissions
+        - Cost: ~$0.012/month (daily function execution)
+    - Terraform Changes:
+        - Updated infrastructure/terraform/modules/bigquery/main.tf with scheduled query and IAM binding
+        - Updated infrastructure/terraform/main.tf with supabase_archiver module and Cloud Scheduler job
+        - All configurations validated successfully with terraform validate
+    - Benefits:
+        - Real-time performance monitoring with automated hourly metrics
+        - Historical trend analysis for operational insights
+        - 84% reduction in storage costs for archived data (Supabase $0.125/GB vs BigQuery $0.02/GB)
+        - Long-term data retention for compliance and analytics
+        - Improved operational database performance (smaller Supabase tables)
+    - Impact: System now has complete analytics infrastructure for performance monitoring and cost-optimized long-term data retention
+    - Key Learning: BigQuery scheduled queries provide zero-maintenance analytics pipelines, and strategic data archival significantly reduces operational costs while maintaining data accessibility
