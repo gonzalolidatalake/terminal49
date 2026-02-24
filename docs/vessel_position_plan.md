@@ -1,9 +1,3 @@
-That's very helpful context. The tiered refresh logic makes sense operationally, but let's start with **daily refresh as MVP** to reduce complexity - we can add the smart refresh logic in a future iteration.
-
-I have enough context now. Here's the strategic implementation plan:
-
----
-
 ## Vessel Position Map - Implementation Plan
 
 ### Overview
@@ -199,7 +193,3 @@ A full-screen interactive map displaying ~250 active vessels with real-time posi
 - Filter by carrier
 - Search vessel by name
 - Real-time position updates (WebSocket)
-
----
-
-Ready to proceed? If this plan looks good, let me know which phase you'd like to start with and I'll generate the specific prompts/instructions.
