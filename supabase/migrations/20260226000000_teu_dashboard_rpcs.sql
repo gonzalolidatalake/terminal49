@@ -90,7 +90,7 @@ BEGIN
     SELECT
         DATE_TRUNC(p_period, s.pol_etd_at)::DATE         AS bucket_date,
         s.shipping_line_scac::TEXT                        AS carrier,
-        SUM(teu_from_equipment_type(c.equipment_type))    AS teus
+        SUM(c.equipment_length/20)    AS teus
     FROM shipments s
     JOIN containers c ON c.shipment_id = s.id
     WHERE
@@ -109,7 +109,7 @@ $$;
 
 COMMENT ON FUNCTION get_teu_series_by_carrier IS
     'Aggregates TEU data by time bucket and carrier for the stacked bar chart. '
-    'TEUs are derived from equipment_type via teu_from_equipment_type(). '
+    'TEUs are derived from equipment_length / 20. '
     'Supports week, month, and quarter bucketing; all filters are optional.';
 
 -- ============================================================================
@@ -157,7 +157,7 @@ BEGIN
         -- MAX picks an arbitrary non-null carrier name from the group; all rows
         -- for the same SCAC should share the same shipping_line_name in practice.
         MAX(s.raw_data -> 'attributes' ->> 'shipping_line_name')::TEXT   AS carrier_name,
-        SUM(teu_from_equipment_type(c.equipment_type))                   AS teus,
+        SUM(c.equipment_length/20)                   AS teus,
         COUNT(DISTINCT c.id)::INTEGER                                    AS container_count,
         COUNT(DISTINCT s.id)::INTEGER                                    AS shipment_count
     FROM shipments s
